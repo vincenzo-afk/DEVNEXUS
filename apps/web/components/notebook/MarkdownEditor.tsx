@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Note } from '@/app/(dashboard)/notebook/page';
+import { Note } from '@/app/(dashboard)/dashboard/notebook/page';
 import { Bold, Italic, Code, Link, List, Save, Sparkles } from 'lucide-react';
 
 interface MarkdownEditorProps {
