@@ -161,19 +161,6 @@ function LoginForm() {
             </motion.button>
           </motion.div>
 
-          {/* Bypass / Demo Mode Button */}
-          <motion.div custom={2.5} variants={fadeInUp} className="mt-3">
-            <motion.button
-              onClick={() => signIn('credentials', { callbackUrl: '/dashboard' })}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-indigo-400 text-sm transition-all duration-300 border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/50"
-            >
-              <Zap className="w-4 h-4" />
-              Skip & Enter Demo Mode
-            </motion.button>
-          </motion.div>
-
           {/* Divider */}
           <motion.div
             custom={3}

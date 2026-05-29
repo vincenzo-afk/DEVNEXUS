@@ -9,6 +9,9 @@ declare module 'next-auth' {
   interface Session {
     /** GitHub OAuth access token with scopes: read:user, user:email, repo */
     accessToken?: string;
+    user: {
+      username?: string;
+    } & import('next-auth').DefaultSession['user'];
   }
 }
 
@@ -19,5 +22,6 @@ declare module 'next-auth/jwt' {
    */
   interface JWT {
     accessToken?: string;
+    username?: string;
   }
 }
