@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GitCommit, GitPullRequest, AlertCircle, Star, GitFork, Clock, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
@@ -15,101 +16,6 @@ export interface ActivityEvent {
   actorAvatar: string;
 }
 
-const INITIAL_EVENTS: ActivityEvent[] = [
-  {
-    id: 'e1',
-    type: 'push',
-    description: 'Pushed 3 commits to branch main',
-    repo: 'devnexus-frontend',
-    time: '2 mins ago',
-    details: 'feat(auth): enable credentials skip button for local demo mode',
-    actor: 'vincenzo-afk',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
-  },
-  {
-    id: 'e2',
-    type: 'pr',
-    description: 'Merged Pull Request #42: Add Recharts dashboards',
-    repo: 'devnexus-frontend',
-    time: '1 hour ago',
-    details: 'Implements commit forecast and repository health scores.',
-    actor: 'vincenzo-afk',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
-  },
-  {
-    id: 'e3',
-    type: 'star',
-    description: 'Starred your repository',
-    repo: 'devnexus-backend',
-    time: '3 hours ago',
-    actor: 'google-gemini-bot',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/108535261?v=4',
-  },
-  {
-    id: 'e4',
-    type: 'issue',
-    description: 'Opened Issue #18: Fix service worker refresh cache on iOS Safari',
-    repo: 'hacker-tools-cli',
-    time: '5 hours ago',
-    details: 'Service worker fails to update cache resources under poor network conditions.',
-    actor: 'hacker-reviewer',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/1285352?v=4',
-  },
-  {
-    id: 'e5',
-    type: 'fork',
-    description: 'Forked your repository',
-    repo: 'devnexus-frontend',
-    time: 'Yesterday',
-    actor: 'indie-developer-zero',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/238531?v=4',
-  },
-  {
-    id: 'e6',
-    type: 'milestone',
-    description: 'Completed Milestone: Phase 2 AI & UI core integration',
-    repo: 'devnexus',
-    time: 'Yesterday',
-    details: 'All core backend services and layout pages integrated.',
-    actor: 'vincenzo-afk',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
-  },
-];
-
-const NEW_EVENT_POOL: Omit<ActivityEvent, 'id' | 'time'>[] = [
-  {
-    type: 'push',
-    description: 'Pushed 1 commit to main',
-    repo: 'devnexus-backend',
-    details: 'fix(ai-judge): resolve floating point score precision parser',
-    actor: 'vincenzo-afk',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
-  },
-  {
-    type: 'star',
-    description: 'Starred your repository',
-    repo: 'devnexus-frontend',
-    actor: 'hacker-news-reviewer',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/148532?v=4',
-  },
-  {
-    type: 'issue',
-    description: 'Closed Issue #14: Implement custom theme context provider',
-    repo: 'devnexus-frontend',
-    details: 'Resolved by writing ThemeProvider using localTheme data attribute.',
-    actor: 'vincenzo-afk',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
-  },
-  {
-    type: 'pr',
-    description: 'Opened Pull Request #43: Edge caching route optimizing',
-    repo: 'smart-todo-scheduler',
-    details: 'Drafting middleware to cache prioritized tasks in cloudflare KV.',
-    actor: 'go-scheduler-bot',
-    actorAvatar: 'https://avatars.githubusercontent.com/u/108535?v=4',
-  },
-];
-
 const config = {
   push: { icon: GitCommit, color: 'text-indigo-400', bg: 'bg-indigo-500/10 border-indigo-500/20' },
   pr: { icon: GitPullRequest, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
@@ -119,33 +25,189 @@ const config = {
   milestone: { icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 };
 
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+}
+
 interface ActivityFeedProps {
   filterType: 'all' | 'push' | 'pr' | 'issue' | 'star';
 }
 
 export default function ActivityFeed({ filterType }: ActivityFeedProps) {
-  const [events, setEvents] = useState<ActivityEvent[]>(INITIAL_EVENTS);
+  const { data: session, status } = useSession();
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate real-time websocket feed
-    const interval = setInterval(() => {
-      const poolIndex = Math.floor(Math.random() * NEW_EVENT_POOL.length);
-      const template = NEW_EVENT_POOL[poolIndex];
-      const newEvent: ActivityEvent = {
-        ...template,
-        id: 'e-' + Date.now(),
-        time: 'Just now',
-      };
-      setEvents((prev) => [newEvent, ...prev.map(e => e.time === 'Just now' ? { ...e, time: '1 min ago' } : e)].slice(0, 15));
-    }, 12000); // Trigger event every 12 seconds
+    const token = session?.accessToken;
+    if (status !== 'authenticated' || !token) {
+      if (status !== 'loading') {
+        setLoading(false);
+      }
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    let isMounted = true;
+
+    async function loadEvents() {
+      try {
+        setError(null);
+        // 1. Get username (login)
+        let username = session?.user?.username;
+        if (!username) {
+          const userRes = await fetch('https://api.github.com/user', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            username = userData.login;
+          }
+        }
+
+        if (!username) {
+          throw new Error('Could not retrieve GitHub username');
+        }
+
+        // 2. Fetch events
+        const eventsRes = await fetch(`https://api.github.com/users/${username}/events`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (!eventsRes.ok) {
+          throw new Error(`Failed to fetch events: ${eventsRes.statusText}`);
+        }
+
+        const rawEvents = await eventsRes.json();
+        if (!Array.isArray(rawEvents)) {
+          throw new Error('Invalid events format received from GitHub');
+        }
+
+        const mapped: ActivityEvent[] = rawEvents
+          .map((item: any) => {
+            let type: ActivityEvent['type'] = 'milestone';
+            if (item.type === 'PushEvent') type = 'push';
+            else if (item.type === 'PullRequestEvent') type = 'pr';
+            else if (item.type === 'IssuesEvent') type = 'issue';
+            else if (item.type === 'WatchEvent') type = 'star';
+            else if (item.type === 'ForkEvent') type = 'fork';
+            else if (item.type === 'CreateEvent') type = 'milestone';
+
+            let description = '';
+            let details = '';
+
+            if (item.type === 'PushEvent') {
+              const count = item.payload.commits ? item.payload.commits.length : 1;
+              const branch = item.payload.ref ? item.payload.ref.replace('refs/heads/', '') : 'main';
+              description = `Pushed ${count} commit${count > 1 ? 's' : ''} to branch ${branch}`;
+              details = item.payload.commits && item.payload.commits[0] ? item.payload.commits[0].message : '';
+            } else if (item.type === 'PullRequestEvent') {
+              const action = item.payload.action;
+              const isMerged = item.payload.pull_request?.merged;
+              description = `${isMerged ? 'Merged' : action.charAt(0).toUpperCase() + action.slice(1)} PR #${item.payload.number}`;
+              details = item.payload.pull_request ? item.payload.pull_request.title : '';
+            } else if (item.type === 'IssuesEvent') {
+              const action = item.payload.action;
+              description = `${action.charAt(0).toUpperCase() + action.slice(1)} Issue #${item.payload.issue?.number}`;
+              details = item.payload.issue ? item.payload.issue.title : '';
+            } else if (item.type === 'WatchEvent') {
+              description = 'Starred repository';
+            } else if (item.type === 'ForkEvent') {
+              description = 'Forked repository';
+            } else if (item.type === 'CreateEvent') {
+              description = `Created ${item.payload.ref_type} ${item.payload.ref || ''}`;
+            } else {
+              description = `${item.type.replace('Event', '')} activity`;
+            }
+
+            return {
+              id: item.id,
+              type,
+              description,
+              repo: item.repo.name,
+              time: formatRelativeTime(item.created_at),
+              details,
+              actor: item.actor.display_login || item.actor.login,
+              actorAvatar: item.actor.avatar_url
+            };
+          });
+
+        if (isMounted) {
+          setEvents(mapped);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || 'An error occurred while loading GitHub events');
+          setLoading(false);
+        }
+      }
+    }
+
+    loadEvents();
+
+    // Poll every 60 seconds
+    const interval = setInterval(loadEvents, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [session, status]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="glass-card p-4 rounded-2xl border border-white/5 bg-white/2 animate-pulse flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white/5 flex-shrink-0" />
+            <div className="flex-1 space-y-2 py-1">
+              <div className="h-3.5 bg-white/10 rounded w-1/3" />
+              <div className="h-4 bg-white/15 rounded w-3/4" />
+              <div className="h-3 bg-white/5 rounded w-1/4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card p-6 rounded-2xl border border-red-500/20 bg-red-500/5 text-center space-y-2">
+        <p className="text-red-400 font-semibold">⚠️ Load Failed</p>
+        <p className="text-sm text-white/55 leading-relaxed">{error}</p>
+      </div>
+    );
+  }
 
   const filteredEvents = events.filter((e) => {
     if (filterType === 'all') return true;
     return e.type === filterType;
   });
+
+  if (filteredEvents.length === 0) {
+    return (
+      <div className="glass-card p-12 rounded-2xl border border-white/5 bg-white/2 text-center text-muted-foreground">
+        No recent {filterType !== 'all' ? `${filterType} ` : ''}events found.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -201,12 +263,12 @@ export default function ActivityFeed({ filterType }: ActivityFeedProps) {
                     {event.repo}
                   </span>
                   <a
-                    href="https://github.com"
+                    href={`https://github.com/${event.repo}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    View commit <ArrowUpRight className="w-3 h-3" />
+                    View on GitHub <ArrowUpRight className="w-3 h-3" />
                   </a>
                 </div>
               </div>

@@ -4,17 +4,12 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Github, BookOpen, CheckSquare, Trophy, Activity, Settings, Moon } from 'lucide-react';
+import { Activity, Settings, Moon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useThemeStore } from '@/stores/useThemeStore';
 
 const navItems = [
-  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'GitHub', href: '/dashboard/github', icon: Github },
-  { name: 'Notebook', href: '/dashboard/notebook', icon: BookOpen },
-  { name: 'TODOs', href: '/dashboard/todos', icon: CheckSquare },
-  { name: 'Hackathons', href: '/dashboard/hackathons', icon: Trophy },
-  { name: 'Activity', href: '/dashboard/activity', icon: Activity },
+  { name: 'Live Feed', href: '/dashboard', icon: Activity },
 ];
 
 export default function Sidebar() {

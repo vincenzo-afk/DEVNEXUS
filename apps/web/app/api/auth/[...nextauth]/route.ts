@@ -1,6 +1,5 @@
 import NextAuth from 'next-auth';
 import GithubProvider from 'next-auth/providers/github';
-import CredentialsProvider from 'next-auth/providers/credentials';
 
 const handler = NextAuth({
   providers: [
@@ -11,32 +10,25 @@ const handler = NextAuth({
         params: { scope: 'read:user user:email repo' },
       },
     }),
-    CredentialsProvider({
-      id: 'credentials',
-      name: 'Demo Mode',
-      credentials: {},
-      async authorize() {
-        return {
-          id: 'dev-user-id',
-          name: 'Demo Developer',
-          email: 'demo@devnexus.ai',
-          image: 'https://avatars.githubusercontent.com/u/583231?v=4',
-        };
-      },
-    }),
   ],
   session: {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, profile }) {
       if (account) {
-        token.accessToken = account.access_token || 'mock-github-access-token';
+        token.accessToken = account.access_token;
+      }
+      if (profile) {
+        token.username = (profile as any).login;
       }
       return token;
     },
     async session({ session, token }) {
-      session.accessToken = (token.accessToken as string) || 'mock-github-access-token';
+      session.accessToken = token.accessToken as string;
+      if (session.user) {
+        session.user.username = token.username as string;
+      }
       return session;
     },
   },
