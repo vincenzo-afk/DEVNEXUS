@@ -636,8 +636,8 @@ Made with ❤️ in India 🇮🇳
 
 If DevNexus made your developer life even 1% better, consider:
 
-[![Star on GitHub](https://img.shields.io/badge/⭐_Star_on_GitHub-181717?style=for-the-badge&logo=github)](https://github.com/yourusername/devnexus)
-[![Share on Twitter](https://img.shields.io/badge/🐦_Share_on_Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/intent/tweet?text=Just%20discovered%20DevNexus%20—%20an%20AI-powered%20command%20center%20for%20developers.%20This%20thing%20is%20wild.%20%F0%9F%A4%AF%0Ahttps%3A%2F%2Fgithub.com%2Fyourusername%2Fdevnexus)
+[![Star on GitHub](https://img.shields.io/badge/⭐_Star_on_GitHub-181717?style=for-the-badge&logo=github)](https://github.com/vincenzo-afk/devnexus)
+[![Share on Twitter](https://img.shields.io/badge/🐦_Share_on_Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/intent/tweet?text=Just%20discovered%20DevNexus%20—%20an%20AI-powered%20command%20center%20for%20developers.%20This%20thing%20is%20wild.%20%F0%9F%A4%AF%0Ahttps%3A%2F%2Fgithub.com%2Fvincenzo-afk%2Fdevnexus)
 
 </div>
 
