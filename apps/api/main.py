@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import ai
+from routers import ai, todos, notes, hackathons, github
 
 app = FastAPI(title="DevNexus API", version="1.0.0")
 app.include_router(ai.router)
+app.include_router(todos.router)
+app.include_router(notes.router)
+app.include_router(hackathons.router)
+app.include_router(github.router)
 
 app.add_middleware(
     CORSMiddleware,

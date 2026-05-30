@@ -1,8 +1,8 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Loader2, Bot, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { sendChatToNexus } from '@/lib/api-client';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Sparkles, Bot, Loader2, Send, X } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -19,6 +19,7 @@ const PLACEHOLDER_MESSAGES: Message[] = [
 ];
 
 export default function NexusSidebar() {
+  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(PLACEHOLDER_MESSAGES);
   const [input, setInput] = useState('');
@@ -34,19 +35,35 @@ export default function NexusSidebar() {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: input };
-    setMessages((m) => [...m, userMsg]);
+    const currentMessages = [...messages, userMsg];
+    setMessages(currentMessages);
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI response
-    await new Promise((r) => setTimeout(r, 1200));
-    const aiMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: "That's a great question! I'm still being connected to the full Gemini backend. Stay tuned — full AI power coming soon! ✨",
-    };
-    setMessages((m) => [...m, aiMsg]);
-    setIsLoading(false);
+    try {
+      // Map Messages to backend MessageSchema (role: "user" | "assistant" | "system")
+      const chatHistory = currentMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const response = await sendChatToNexus(chatHistory, session?.accessToken);
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response.response || 'No response returned from Nexus.',
+      };
+      setMessages((m) => [...m, aiMsg]);
+    } catch (error) {
+      console.error(error);
+      const errMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Error: Failed to communicate with Gemini. Ensure the backend API is online.',
+      };
+      setMessages((m) => [...m, errMsg]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

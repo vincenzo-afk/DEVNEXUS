@@ -12,21 +12,113 @@ MODEL_NAME = "gemini-1.5-flash"
 def get_model():
     return genai.GenerativeModel(MODEL_NAME)
 
-async def generate_daily_chronicle(commits: List[str], todos: List[str]) -> str:
+async def generate_daily_chronicle(
+    commits: List[str],
+    todos: List[str],
+    notes: List[str] = None,
+    target_date: str = None,
+) -> Dict[str, Any]:
+    notes_str = f"\nKey Highlights/Notes: {notes}" if notes else ""
     prompt = f"""
-    You are an AI narrator for a developer.
-    Here are their commits from yesterday:
-    {commits}
+    You are an AI narrator for a developer command center. 
+    Yesterday's Commits: {commits}
+    Today's TODOs: {todos}{notes_str}
     
-    Here are their top TODOs for today:
-    {todos}
-    
-    Write a short, engaging, and slightly witty daily chronicle (max 3 paragraphs) 
-    summarizing their progress and motivating them for the day ahead.
+    Write a short, engaging, and slightly witty daily chronicle summarizing progress and outlook.
+    Provide the response as JSON exactly in this format without markdown codeblocks:
+    {{
+      "headline": "A catchy, fun headline.",
+      "narrative": "A short, witty paragraph or two summarizing the developer's progress.",
+      "mood": "Productive / Chill / Chaotic / Focused"
+    }}
     """
     model = get_model()
     response = model.generate_content(prompt)
-    return response.text
+    import json
+    try:
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+    except Exception:
+        return {
+            "headline": "Code, Eat, Sleep, Repeat",
+            "narrative": response.text.strip(),
+            "mood": "Focused"
+        }
+
+async def generate_weekly_arc(
+    week_start: str,
+    commits: List[str],
+    todos_completed: List[str],
+    hackathons: List[str],
+    highlights: List[str],
+) -> Dict[str, Any]:
+    prompt = f"""
+    Analyze the developer's weekly activity starting {week_start}:
+    Commits: {commits}
+    Todos Completed: {todos_completed}
+    Hackathons Active: {hackathons}
+    Key Highlights/Notes: {highlights}
+    
+    Generate a weekly developer "story arc" summarizing their journey.
+    Provide a JSON response exactly in this format without markdown codeblocks:
+    {{
+      "title": "Weekly Arc Title",
+      "narrative": "A high-level paragraph summarizing their weekly arc.",
+      "chapters": [
+        "Chapter 1 description...",
+        "Chapter 2 description..."
+      ],
+      "epilogue": "A brief, motivating epilogue paragraph.",
+      "xp_earned": 150,
+      "badges": ["Streak Master", "Code Warrior"]
+    }}
+    """
+    model = get_model()
+    response = model.generate_content(prompt)
+    import json
+    try:
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+    except Exception:
+        return {
+            "title": "A Week of Build",
+            "narrative": response.text.strip(),
+            "chapters": ["Shipped features"],
+            "epilogue": "Keep pushing forward.",
+            "xp_earned": 100,
+            "badges": ["Constructor"]
+        }
+
+async def score_todo(title: str, description: str = "") -> int:
+    prompt = f"""
+    You are an AI task prioritizer. Score the following task from 1 to 100 based on its importance, urgency, and developmental impact.
+    Task: {title}
+    Description: {description}
+    
+    Output ONLY the integer score (e.g., 85), nothing else. No explanation.
+    """
+    model = get_model()
+    response = model.generate_content(prompt)
+    try:
+        return int(response.text.strip())
+    except Exception:
+        return 50
+
+async def generate_subtasks(title: str) -> List[str]:
+    prompt = f"""
+    You are a technical lead. Generate 3 to 5 clear, actionable subtasks for this task: "{title}"
+    
+    Output ONLY a JSON list of strings, nothing else. No markdown block. Example:
+    ["Subtask 1", "Subtask 2"]
+    """
+    model = get_model()
+    response = model.generate_content(prompt)
+    import json
+    try:
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+    except Exception:
+        return []
 
 async def generate_pitch(project_name: str, description: str, stack: List[str]) -> str:
     prompt = f"""
@@ -88,3 +180,4 @@ async def expand_idea(idea: str) -> str:
     model = get_model()
     response = model.generate_content(prompt)
     return response.text
+
