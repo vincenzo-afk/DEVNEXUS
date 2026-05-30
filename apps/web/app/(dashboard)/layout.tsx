@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import CommandPalette from '@/components/dashboard/CommandPalette';
+import NexusSidebar from '@/components/dashboard/NexusSidebar';
+import VibeMode from '@/components/shared/VibeMode';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -29,6 +32,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      <NexusSidebar />
+      <CommandPalette />
+      <VibeMode />
     </div>
   );
 }

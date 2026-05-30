@@ -68,19 +68,19 @@ async def _fetch_user_notes(user_id: str, target_date: str) -> list[str]:
         return []
 
 
-async def _fetch_user_github_token(user_id: str) -> Optional[str]:
+async def _fetch_user_github_token(user_id: str) -> tuple[Optional[str], Optional[str]]:
     """Retrieve the stored GitHub access token for a user."""
     try:
         supabase = _get_supabase()
         response = (
             supabase.table("users")
-            .select("github_token, github_username")
+            .select("github_access_token, username")
             .eq("id", user_id)
             .single()
             .execute()
         )
         if response.data:
-            return response.data.get("github_token"), response.data.get("github_username")
+            return response.data.get("github_access_token"), response.data.get("username")
     except Exception as exc:
         logger.warning("Failed to fetch GitHub token for user %s: %s", user_id, exc)
     return None, None
@@ -89,42 +89,73 @@ async def _fetch_user_github_token(user_id: str) -> Optional[str]:
 async def _save_chronicle(user_id: str, chronicle: dict) -> None:
     """Persist chronicle to the chronicles table."""
     try:
+        import json
         supabase = _get_supabase()
-        supabase.table("chronicles").upsert(
-            {
-                "user_id": user_id,
-                "date": chronicle["date"],
-                "headline": chronicle["headline"],
-                "narrative": chronicle["narrative"],
-                "mood": chronicle["mood"],
-            },
-            on_conflict="user_id,date",
-        ).execute()
+        content_data = {
+            "headline": chronicle.get("headline", ""),
+            "narrative": chronicle.get("narrative", ""),
+            "mood": chronicle.get("mood", "")
+        }
+        existing = (
+            supabase.table("chronicles")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("date", chronicle["date"])
+            .eq("type", "daily")
+            .execute()
+        )
+        data = {
+            "user_id": user_id,
+            "date": chronicle["date"],
+            "type": "daily",
+            "content": json.dumps(content_data),
+            "is_roast_mode": chronicle.get("is_roast_mode", False),
+        }
+        if existing.data:
+            supabase.table("chronicles").update(data).eq("id", existing.data[0]["id"]).execute()
+        else:
+            supabase.table("chronicles").insert(data).execute()
         logger.info("Chronicle saved for user %s on %s", user_id, chronicle["date"])
     except Exception as exc:
         logger.error("Failed to save chronicle for user %s: %s", user_id, exc)
 
 
 async def _save_weekly_arc(user_id: str, arc: dict) -> None:
-    """Persist weekly arc to the weekly_arcs table."""
+    """Persist weekly arc to the chronicles table."""
     try:
+        import json
         supabase = _get_supabase()
-        supabase.table("weekly_arcs").upsert(
-            {
-                "user_id": user_id,
-                "week_start": arc.get("week_start"),
-                "title": arc.get("title"),
-                "narrative": arc.get("narrative"),
-                "chapters": arc.get("chapters"),
-                "epilogue": arc.get("epilogue"),
-                "xp_earned": arc.get("xp_earned", 0),
-                "badges": arc.get("badges", []),
-            },
-            on_conflict="user_id,week_start",
-        ).execute()
+        content_data = {
+            "title": arc.get("title", ""),
+            "narrative": arc.get("narrative", ""),
+            "chapters": arc.get("chapters", []),
+            "epilogue": arc.get("epilogue", ""),
+            "xp_earned": arc.get("xp_earned", 0),
+            "badges": arc.get("badges", []),
+        }
+        existing = (
+            supabase.table("chronicles")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("date", arc["week_start"])
+            .eq("type", "weekly")
+            .execute()
+        )
+        data = {
+            "user_id": user_id,
+            "date": arc["week_start"],
+            "type": "weekly",
+            "content": json.dumps(content_data),
+            "is_roast_mode": False,
+        }
+        if existing.data:
+            supabase.table("chronicles").update(data).eq("id", existing.data[0]["id"]).execute()
+        else:
+            supabase.table("chronicles").insert(data).execute()
         logger.info("Weekly arc saved for user %s", user_id)
     except Exception as exc:
         logger.error("Failed to save weekly arc for user %s: %s", user_id, exc)
+
 
 
 # ---------------------------------------------------------------------------

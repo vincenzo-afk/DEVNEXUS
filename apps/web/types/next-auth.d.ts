@@ -11,6 +11,7 @@ declare module 'next-auth' {
     accessToken?: string;
     user: {
       username?: string;
+      githubId?: string;
     } & import('next-auth').DefaultSession['user'];
   }
 }
@@ -23,5 +24,6 @@ declare module 'next-auth/jwt' {
   interface JWT {
     accessToken?: string;
     username?: string;
+    githubId?: string;
   }
 }

@@ -21,6 +21,7 @@ const handler = NextAuth({
       }
       if (profile) {
         token.username = (profile as any).login;
+        token.githubId = String((profile as any).id);
       }
       return token;
     },
@@ -28,6 +29,7 @@ const handler = NextAuth({
       session.accessToken = token.accessToken as string;
       if (session.user) {
         session.user.username = token.username as string;
+        session.user.githubId = token.githubId as string;
       }
       return session;
     },
