@@ -65,3 +65,6 @@ dist/
 
 # Turbo
 .turbo/
+
+# Project metadata to not push
+PROBLEMS_SOLVED.md
