@@ -55,11 +55,12 @@ export default function ActivityFeed({ filterType, searchQuery = '', refreshKey 
       return;
     }
     let mounted = true;
+    const authToken = token;
     async function loadEvents() {
       try {
         setError(null);
-        await syncActivity(token);
-        const data = await getActivity(token);
+        await syncActivity(authToken);
+        const data = await getActivity(authToken);
         if (mounted) setEvents(data);
       } catch (err) {
         if (mounted) setError(err instanceof Error ? err.message : 'Unable to load activity');

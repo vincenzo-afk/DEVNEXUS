@@ -134,7 +134,7 @@ export default function StatsCards({ stats }: { stats: GitHubStats }) {
     },
     {
       icon: <GitPullRequest size={18} />,
-      label: 'PRs Merged',
+      label: 'PR Contributions',
       value: stats.prsMerged,
       change: stats.prsThisWeek,
       changeLabel: 'this week',

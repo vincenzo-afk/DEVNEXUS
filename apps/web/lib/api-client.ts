@@ -362,6 +362,16 @@ export async function dismissNotification(notificationId: string, token: string)
 }
 
 // GitHub endpoints
+export async function getTrendingRepos(language?: string) {
+  const query = language ? `?language=${encodeURIComponent(language)}` : '';
+  const response = await fetch(`${API_URL}/github/trending${query}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch trending repositories');
+  return response.json();
+}
+
 export async function getGitHubRepos(token: string) {
   const response = await fetch(`${API_URL}/github/repos`, {
     method: 'GET',

@@ -2,14 +2,17 @@ import os
 import google.generativeai as genai
 from typing import List, Dict, Any
 
-# Ensure the key is set (in a real app, use a configuration manager)
-api_key = os.getenv("GEMINI_API_KEY", "AIzaSyBM2E1XBPpgAZBpIhbPx0WOubFnYUsHlHs")
-genai.configure(api_key=api_key)
+from config import settings
+
+if settings.GEMINI_API_KEY:
+    genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # We use gemini-1.5-pro or flash depending on needs
 MODEL_NAME = "gemini-1.5-flash"
 
 def get_model():
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
     return genai.GenerativeModel(MODEL_NAME)
 
 async def generate_daily_chronicle(

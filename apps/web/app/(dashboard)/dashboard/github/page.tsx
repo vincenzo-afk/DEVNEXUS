@@ -9,7 +9,7 @@ import ContributionHeatmap from '@/components/github/ContributionHeatmap';
 import CommitForecast, { CommitForecastPoint } from '@/components/github/CommitForecast';
 import RepoHealthScore from '@/components/github/RepoHealthScore';
 import { ContributionCalendarData } from '@/components/github/ContributionHeatmap';
-import { getGitHubStats, getGitHubRepos, getGitHubContributions, getGitHubForecast } from '@/lib/api-client';
+import { getGitHubStats, getGitHubRepos, getGitHubContributions, getGitHubForecast, getTrendingRepos } from '@/lib/api-client';
 
 export default function GitHubPage() {
   const { data: session } = useSession();
@@ -17,6 +17,7 @@ export default function GitHubPage() {
   const [repos, setRepos] = useState<any[]>([]);
   const [contributions, setContributions] = useState<ContributionCalendarData | null>(null);
   const [forecast, setForecast] = useState<CommitForecastPoint[] | null>(null);
+  const [trendingRepos, setTrendingRepos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,16 +26,18 @@ export default function GitHubPage() {
       if (!session?.accessToken) return;
       try {
         setLoading(true);
-        const [statsData, reposData, contributionsData, forecastData] = await Promise.all([
+        const [statsData, reposData, contributionsData, forecastData, trendingData] = await Promise.all([
           getGitHubStats(session.accessToken),
           getGitHubRepos(session.accessToken),
           getGitHubContributions(session.accessToken),
           getGitHubForecast(session.accessToken),
+          getTrendingRepos().catch(() => []),
         ]);
         setStats(statsData);
         setRepos(reposData);
         setContributions(contributionsData);
         setForecast(forecastData);
+        setTrendingRepos(trendingData);
       } catch (err: any) {
         console.error(err);
         setError('Failed to fetch data from GitHub Command Center. Check API status.');
@@ -195,6 +198,29 @@ export default function GitHubPage() {
           ))}
         </div>
       </div>
+
+      {trendingRepos.length > 0 && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Trending Contribution Targets</h2>
+            <p className="text-xs text-muted-foreground">Discover active repositories that may match your next contribution.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {trendingRepos.slice(0, 6).map((repo) => (
+              <a key={repo.full_name || repo.name} href={repo.url} target="_blank" rel="noopener noreferrer" className="glass-card rounded-2xl border border-white/10 bg-white/[0.02] p-5 transition-all hover:-translate-y-1 hover:border-indigo-500/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-white">{repo.full_name || repo.name}</h3>
+                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/55">{repo.description || 'No description provided.'}</p>
+                  </div>
+                  <ExternalLink className="h-4 w-4 flex-shrink-0 text-white/35" />
+                </div>
+                <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground"><span>{repo.language || 'Other'}</span><span>★ {repo.stars ?? 0}</span><span>Forks {repo.forks ?? 0}</span></div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

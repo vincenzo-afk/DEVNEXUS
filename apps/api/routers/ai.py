@@ -59,17 +59,17 @@ async def trigger_chronicle_generation(user: dict = Depends(get_current_user)):
     }
 
 @router.post("/pitch", response_model=PitchResponse)
-async def create_pitch(request: PitchRequest):
+async def create_pitch(request: PitchRequest, _: dict = Depends(get_current_user)):
     pitch = await gemini_service.generate_pitch(request.project_name, request.description, request.stack)
     return PitchResponse(pitch=pitch)
 
 @router.post("/judge")
-async def create_judge_simulation(request: JudgeRequest):
+async def create_judge_simulation(request: JudgeRequest, _: dict = Depends(get_current_user)):
     result = await gemini_service.simulate_judge(request.project_idea)
     return result
 
 @router.post("/expand-idea", response_model=ExpandIdeaResponse)
-async def expand_idea(request: ExpandIdeaRequest):
+async def expand_idea(request: ExpandIdeaRequest, _: dict = Depends(get_current_user)):
     expanded = await gemini_service.expand_idea(request.idea)
     return ExpandIdeaResponse(expanded=expanded)
 
@@ -104,9 +104,15 @@ async def chat_nexus(request: ChatRequest, user: dict = Depends(get_current_user
         system_instruction=system_prompt
     )
     
-    chat = model.start_chat(history=[])
-    # The last message content
-    user_query = request.messages[-1].content
+    history = []
+    for message in request.messages[:-1]:
+        role = "model" if message.role == "assistant" else "user"
+        history.append({"role": role, "parts": [message.content]})
+
+    chat = model.start_chat(history=history)
+    user_query = request.messages[-1].content if request.messages else ""
+    if not user_query:
+        return {"response": "Tell me what you are building, debugging, or planning next."}
     response = chat.send_message(user_query)
     
     return {"response": response.text}

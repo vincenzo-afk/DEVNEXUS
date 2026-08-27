@@ -12,6 +12,16 @@ from services import github_service
 logger = logging.getLogger("devnexus.github.router")
 router = APIRouter(prefix="/github", tags=["GitHub"])
 
+LANGUAGE_COLORS = {
+    "TypeScript": "#3178c6",
+    "Python": "#3572a5",
+    "JavaScript": "#f1e05a",
+    "Rust": "#dea584",
+    "Go": "#00add8",
+    "HTML": "#e34c26",
+    "CSS": "#563d7c",
+}
+
 
 def _github_error(exc: Exception) -> HTTPException:
     logger.exception("GitHub telemetry request failed", exc_info=exc)
@@ -31,13 +41,21 @@ def _map_repo(repo: dict) -> dict:
         "stars": repo.get("stars", 0),
         "forks": repo.get("forks", 0),
         "language": repo.get("language") or "Other",
-        "languageColor": repo.get("language_color", "#858585"),
+        "languageColor": LANGUAGE_COLORS.get(repo.get("language") or "", "#858585"),
         "openIssues": repo.get("open_issues", 0),
         "updatedAt": repo.get("pushed_at"),
         "healthScore": repo.get("health_score", 0),
         "topics": repo.get("topics", []),
         "url": repo.get("url", ""),
     }
+
+
+@router.get("/trending")
+async def get_trending(language: str | None = None):
+    try:
+        return await github_service.get_trending_repos(language=language)
+    except Exception as exc:
+        raise _github_error(exc) from exc
 
 
 @router.get("/repos")
