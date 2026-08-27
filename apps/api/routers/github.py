@@ -1,151 +1,114 @@
-import httpx
-import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from middleware.auth import get_github_token, get_current_user
+"""Authenticated GitHub telemetry endpoints for the DevNexus dashboard."""
 
-logger = logging.getLogger("devnexus.github")
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from middleware.auth import get_current_user, get_github_token
+from services import github_service
+
+logger = logging.getLogger("devnexus.github.router")
 router = APIRouter(prefix="/github", tags=["GitHub"])
 
-@router.get("/repos")
-async def get_repos(token: str = Depends(get_github_token)):
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json",
-        "User-Agent": "DevNexus-App"
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            # Get user repos (both owned and collaborated)
-            response = await client.get("https://api.github.com/user/repos?sort=updated&per_page=30", headers=headers)
-            if response.status_code != 200:
-                logger.error(f"GitHub /user/repos failed with code {response.status_code}: {response.text}")
-                raise HTTPException(status_code=response.status_code, detail="Failed to fetch repos from GitHub")
-            repos = response.json()
-            
-            # Map repos to the structure the frontend expects
-            result = []
-            for repo in repos:
-                # Basic language colors mapping
-                lang = repo.get("language") or "Other"
-                lang_colors = {
-                    "TypeScript": "#3178c6",
-                    "Python": "#3572A5",
-                    "Rust": "#dea584",
-                    "Go": "#00ADD8",
-                    "JavaScript": "#f1e05a",
-                    "HTML": "#e34c26",
-                    "CSS": "#563d7c",
-                }
-                lang_color = lang_colors.get(lang, "#858585")
-                
-                # Health score logic: calculate a mock/dynamic health score based on open issues, description presence, license, readme, etc.
-                health_score = 100
-                if repo.get("open_issues_count", 0) > 10:
-                    health_score -= 20
-                elif repo.get("open_issues_count", 0) > 0:
-                    health_score -= 5
-                if not repo.get("description"):
-                    health_score -= 15
-                if not repo.get("license"):
-                    health_score -= 10
-                if repo.get("has_wiki") is False:
-                    health_score -= 5
-                health_score = max(30, health_score)
 
-                # Format updated_at: e.g. "2 hours ago" or similar or just standard date/time
-                updated_at_raw = repo.get("updated_at", "")
-                
-                result.append({
-                    "id": str(repo["id"]),
-                    "name": repo["name"],
-                    "description": repo.get("description") or "No description provided.",
-                    "stars": repo.get("stargazers_count", 0),
-                    "forks": repo.get("forks_count", 0),
-                    "language": lang,
-                    "languageColor": lang_color,
-                    "openIssues": repo.get("open_issues_count", 0),
-                    "updatedAt": updated_at_raw,
-                    "healthScore": health_score,
-                    "url": repo.get("html_url")
-                })
-            return result
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=500, detail=f"GitHub API connection error: {str(exc)}")
+def _github_error(exc: Exception) -> HTTPException:
+    logger.exception("GitHub telemetry request failed", exc_info=exc)
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="GitHub telemetry is temporarily unavailable. Please retry shortly.",
+    )
+
+
+def _map_repo(repo: dict) -> dict:
+    """Keep the existing frontend contract while using the real service fields."""
+    return {
+        "id": repo.get("id", ""),
+        "name": repo.get("name", ""),
+        "fullName": repo.get("full_name", ""),
+        "description": repo.get("description") or "No description provided.",
+        "stars": repo.get("stars", 0),
+        "forks": repo.get("forks", 0),
+        "language": repo.get("language") or "Other",
+        "languageColor": repo.get("language_color", "#858585"),
+        "openIssues": repo.get("open_issues", 0),
+        "updatedAt": repo.get("pushed_at"),
+        "healthScore": repo.get("health_score", 0),
+        "topics": repo.get("topics", []),
+        "url": repo.get("url", ""),
+    }
+
+
+@router.get("/repos")
+async def get_repos(token: str = Depends(get_github_token), user: dict = Depends(get_current_user)):
+    try:
+        repos = await github_service.get_repos(user["login"], token)
+        return [_map_repo(repo) for repo in repos]
+    except Exception as exc:
+        raise _github_error(exc) from exc
+
 
 @router.get("/stats")
-async def get_stats(token: str = Depends(get_github_token)):
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json",
-        "User-Agent": "DevNexus-App"
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            # 1. Fetch user repos
-            response = await client.get("https://api.github.com/user/repos?per_page=100", headers=headers)
-            if response.status_code != 200:
-                logger.error(f"GitHub /user/repos failed for stats with code {response.status_code}: {response.text}")
-                raise HTTPException(status_code=response.status_code, detail="Failed to fetch repos for stats")
-            repos = response.json()
-            
-            total_stars = sum(r.get("stargazers_count", 0) for r in repos)
-            total_forks = sum(r.get("forks_count", 0) for r in repos)
-            
-            prs_merged = 0
-            contribution_streak = 5 # default baseline
-            
-            # Let's count PRs created/merged via search API
-            search_pr_response = await client.get("https://api.github.com/search/issues?q=author:@me+type:pr", headers=headers)
-            if search_pr_response.status_code == 200:
-                prs_merged = search_pr_response.json().get("total_count", 0)
-            
-            return {
-                "totalStars": total_stars,
-                "totalForks": total_forks,
-                "prsMerged": prs_merged,
-                "contributionStreak": contribution_streak,
-                "starsThisWeek": int(total_stars * 0.05) + 1,
-                "forksThisWeek": int(total_forks * 0.03) + 1,
-                "prsThisWeek": 2,
-                "streakChange": 1
-            }
-        except Exception as exc:
-            logger.warning(f"Error gathering live github stats: {str(exc)}")
-            # Return baseline fallback in case of errors
-            return {
-                "totalStars": 15,
-                "totalForks": 4,
-                "prsMerged": 5,
-                "contributionStreak": 3,
-                "starsThisWeek": 1,
-                "forksThisWeek": 0,
-                "prsThisWeek": 1,
-                "streakChange": 0
-            }
+async def get_stats(token: str = Depends(get_github_token), user: dict = Depends(get_current_user)):
+    try:
+        stats = await github_service.get_user_stats(user["login"], token)
+        # The frontend expects camelCase fields. Deltas are intentionally zero
+        # until the service has a time-windowed comparison rather than guesses.
+        return {
+            "username": stats.get("username", user["login"]),
+            "name": stats.get("name"),
+            "avatarUrl": stats.get("avatar_url"),
+            "bio": stats.get("bio"),
+            "followers": stats.get("followers", 0),
+            "following": stats.get("following", 0),
+            "publicRepos": stats.get("public_repos", 0),
+            "totalStars": stats.get("total_stars", 0),
+            "totalForks": stats.get("total_forks", 0),
+            "prsMerged": stats.get("total_pull_request_contributions", 0),
+            "contributionStreak": stats.get("contribution_streak", 0),
+            "longestStreak": stats.get("longest_streak", 0),
+            "totalContributions": stats.get("total_contributions", 0),
+            "totalCommitContributions": stats.get("total_commit_contributions", 0),
+            "totalIssueContributions": stats.get("total_issue_contributions", 0),
+            "starsThisWeek": 0,
+            "forksThisWeek": 0,
+            "prsThisWeek": 0,
+            "streakChange": 0,
+        }
+    except Exception as exc:
+        raise _github_error(exc) from exc
+
+
+@router.get("/contributions")
+async def get_contributions(
+    token: str = Depends(get_github_token),
+    user: dict = Depends(get_current_user),
+):
+    try:
+        return await github_service.get_contribution_calendar(user["login"], token)
+    except Exception as exc:
+        raise _github_error(exc) from exc
+
 
 @router.get("/forecast")
-async def get_forecast(token: str = Depends(get_github_token)):
-    # Simply generate a forecast structure based on pattern or return it dynamically
-    import random
-    from datetime import datetime, timedelta
-    
-    today = datetime.now()
-    forecast_data = []
-    
-    days_of_week = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    base_commits = {"Sun": 4, "Mon": 11, "Tue": 14, "Wed": 12, "Thu": 10, "Fri": 8, "Sat": 5}
-    
-    for i in range(7):
-        d = today + timedelta(days=i)
-        dow = d.strftime("%a")
-        full_day = d.strftime("%a, %b %d")
-        base = base_commits.get(dow, 8)
-        predicted = max(1, base + random.randint(-2, 3))
-        forecast_data.append({
-            "day": dow,
-            "fullDay": full_day,
-            "predicted": predicted,
-            "confidence": random.randint(70, 95)
-        })
-        
-    return forecast_data
+async def get_forecast(
+    token: str = Depends(get_github_token),
+    user: dict = Depends(get_current_user),
+):
+    try:
+        calendar = await github_service.get_contribution_calendar(user["login"], token)
+        history = [day for week in calendar.get("weeks", []) for day in week.get("days", [])]
+        forecast = github_service.forecast_commits(history)
+        return [
+            {
+                "date": entry["date"],
+                "day": entry["date"],
+                "fullDay": entry["date"],
+                "predicted": entry["predicted_commits"],
+                "confidence": round(entry["confidence"] * 100),
+            }
+            for entry in forecast
+        ]
+    except Exception as exc:
+        raise _github_error(exc) from exc

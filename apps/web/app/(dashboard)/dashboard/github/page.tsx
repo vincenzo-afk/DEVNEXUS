@@ -6,14 +6,17 @@ import { motion } from 'framer-motion';
 import { Github, Star, GitFork, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import StatsCards from '@/components/github/StatsCards';
 import ContributionHeatmap from '@/components/github/ContributionHeatmap';
-import CommitForecast from '@/components/github/CommitForecast';
+import CommitForecast, { CommitForecastPoint } from '@/components/github/CommitForecast';
 import RepoHealthScore from '@/components/github/RepoHealthScore';
-import { getGitHubStats, getGitHubRepos } from '@/lib/api-client';
+import { ContributionCalendarData } from '@/components/github/ContributionHeatmap';
+import { getGitHubStats, getGitHubRepos, getGitHubContributions, getGitHubForecast } from '@/lib/api-client';
 
 export default function GitHubPage() {
   const { data: session } = useSession();
   const [stats, setStats] = useState<any>(null);
   const [repos, setRepos] = useState<any[]>([]);
+  const [contributions, setContributions] = useState<ContributionCalendarData | null>(null);
+  const [forecast, setForecast] = useState<CommitForecastPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,12 +25,16 @@ export default function GitHubPage() {
       if (!session?.accessToken) return;
       try {
         setLoading(true);
-        const [statsData, reposData] = await Promise.all([
+        const [statsData, reposData, contributionsData, forecastData] = await Promise.all([
           getGitHubStats(session.accessToken),
-          getGitHubRepos(session.accessToken)
+          getGitHubRepos(session.accessToken),
+          getGitHubContributions(session.accessToken),
+          getGitHubForecast(session.accessToken),
         ]);
         setStats(statsData);
         setRepos(reposData);
+        setContributions(contributionsData);
+        setForecast(forecastData);
       } catch (err: any) {
         console.error(err);
         setError('Failed to fetch data from GitHub Command Center. Check API status.');
@@ -104,7 +111,7 @@ export default function GitHubPage() {
             <p className="text-xs text-muted-foreground">Your contribution history over the past 365 days.</p>
           </div>
         </div>
-        <ContributionHeatmap />
+        <ContributionHeatmap calendar={contributions} />
       </div>
 
       {/* Middle row: Repo Health & Commit Forecast */}
@@ -120,7 +127,7 @@ export default function GitHubPage() {
 
         {/* Commit Forecast Card (7/12 columns) */}
         <div className="lg:col-span-7 glass-card p-6 rounded-2xl border border-white/10 bg-white/3 backdrop-blur-md">
-          <CommitForecast />
+          <CommitForecast forecast={forecast} />
         </div>
       </div>
 

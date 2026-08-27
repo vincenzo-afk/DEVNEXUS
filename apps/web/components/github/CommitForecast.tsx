@@ -1,190 +1,92 @@
 'use client';
 
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
 
-const today = new Date();
-
-function getDayLabel(offset: number): string {
-  const d = new Date(today);
-  d.setDate(d.getDate() + offset);
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+export interface CommitForecastPoint {
+  date: string;
+  day?: string;
+  fullDay?: string;
+  predicted: number;
+  confidence: number;
 }
 
-function getShortDay(offset: number): string {
-  const d = new Date(today);
-  d.setDate(d.getDate() + offset);
-  return d.toLocaleDateString('en-US', { weekday: 'short' });
+interface CommitForecastProps {
+  forecast: CommitForecastPoint[] | null;
 }
-
-// Simulate a realistic weekly commit pattern
-const BASE_COMMITS: Record<string, number> = {
-  Sun: 4,
-  Mon: 11,
-  Tue: 14,
-  Wed: 12,
-  Thu: 10,
-  Fri: 8,
-  Sat: 5,
-};
-
-function predictCommits(offset: number): number {
-  const d = new Date(today);
-  d.setDate(d.getDate() + offset);
-  const dow = d.toLocaleDateString('en-US', { weekday: 'short' });
-  const base = BASE_COMMITS[dow] ?? 8;
-  // Add some noise
-  const noise = Math.floor(Math.random() * 4) - 2;
-  return Math.max(1, base + noise);
-}
-
-const forecastData = Array.from({ length: 7 }, (_, i) => ({
-  day: getShortDay(i),
-  fullDay: getDayLabel(i),
-  predicted: predictCommits(i),
-  confidence: Math.floor(70 + Math.random() * 25),
-}));
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: Array<{ value: number; payload: { fullDay: string; confidence: number } }>;
-  label?: string;
+  payload?: Array<{ value: number; payload: CommitForecastPoint }>;
 }
 
 function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
-  const data = payload[0];
+  const point = payload[0].payload;
+  const date = new Date(`${point.date}T00:00:00Z`);
   return (
-    <div
-      className="px-3 py-2.5 rounded-xl text-xs shadow-2xl"
-      style={{
-        background: 'hsl(var(--card))',
-        border: '1px solid hsl(var(--border))',
-        backdropFilter: 'blur(12px)',
-      }}
-    >
-      <p className="text-muted-foreground mb-1">{data.payload.fullDay}</p>
-      <p className="font-bold text-sm" style={{ color: 'hsl(var(--primary))' }}>
-        Predicted: {data.value} commits
-      </p>
-      <p className="text-muted-foreground mt-0.5">
-        Confidence: {data.payload.confidence}%
-      </p>
+    <div className="rounded-xl border border-border bg-card px-3 py-2.5 text-xs shadow-2xl">
+      <p className="mb-1 text-muted-foreground">{date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })}</p>
+      <p className="text-sm font-bold" style={{ color: 'hsl(var(--primary))' }}>Predicted: {point.predicted} commits</p>
+      <p className="mt-0.5 text-muted-foreground">Confidence: {point.confidence}%</p>
     </div>
   );
 }
 
-export default function CommitForecast() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-      className="h-full flex flex-col"
-    >
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-foreground">
-          🔮 Commit Forecast — Next 7 Days
-        </h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Powered by Gemini pattern analysis
-        </p>
-      </div>
+export default function CommitForecast({ forecast }: CommitForecastProps) {
+  const chartData = useMemo(() => (forecast ?? []).map((point) => {
+    const date = new Date(`${point.date}T00:00:00Z`);
+    return {
+      ...point,
+      day: date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
+      fullDay: date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' }),
+    };
+  }), [forecast]);
 
-      {/* Mini stats */}
-      <div className="flex items-center gap-4 mb-4">
+  if (!forecast || chartData.length === 0) {
+    return (
+      <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-muted-foreground">
+        Forecast data is not available yet. Connect GitHub and retry the sync.
+      </div>
+    );
+  }
+
+  const average = Math.round(chartData.reduce((sum, point) => sum + point.predicted, 0) / chartData.length);
+  const peak = chartData.reduce((best, point) => point.predicted > best.predicted ? point : best, chartData[0]);
+  const avgConfidence = Math.round(chartData.reduce((sum, point) => sum + point.confidence, 0) / chartData.length);
+
+  return (
+    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} className="flex h-full flex-col">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-foreground">Commit Forecast — Next 7 Days</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">Derived from your contribution history by day of week.</p>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         {[
-          {
-            label: 'Avg / day',
-            value: Math.round(
-              forecastData.reduce((a, b) => a + b.predicted, 0) / forecastData.length
-            ),
-          },
-          {
-            label: 'Peak day',
-            value:
-              forecastData.reduce((a, b) => (a.predicted > b.predicted ? a : b)).day,
-          },
-          {
-            label: 'Avg confidence',
-            value:
-              Math.round(
-                forecastData.reduce((a, b) => a + b.confidence, 0) / forecastData.length
-              ) + '%',
-          },
+          { label: 'Avg / day', value: average },
+          { label: 'Peak day', value: chartData.find((p) => p.date === peak.date)?.day ?? peak.date },
+          { label: 'Avg confidence', value: `${avgConfidence}%` },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="px-3 py-1.5 rounded-lg text-xs"
-            style={{
-              background: 'hsl(var(--secondary))',
-              border: '1px solid hsl(var(--border))',
-            }}
-          >
-            <span className="text-muted-foreground">{stat.label}: </span>
-            <span className="font-semibold text-foreground">{stat.value}</span>
+          <div key={stat.label} className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs">
+            <span className="text-muted-foreground">{stat.label}: </span><span className="font-semibold text-foreground">{stat.value}</span>
           </div>
         ))}
       </div>
-
-      <div className="flex-1" style={{ minHeight: 200 }}>
+      <div className="min-h-[200px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={forecastData}
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-          >
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="commitGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
                 <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="hsl(var(--border))"
-              opacity={0.3}
-              vertical={false}
-            />
-            <XAxis
-              dataKey="day"
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              allowDecimals={false}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+            <XAxis dataKey="day" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
-            <Area
-              type="monotone"
-              dataKey="predicted"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2.5}
-              fill="url(#commitGradient)"
-              dot={{
-                fill: 'hsl(var(--primary))',
-                stroke: 'hsl(var(--background))',
-                strokeWidth: 2,
-                r: 4,
-              }}
-              activeDot={{
-                fill: 'hsl(var(--primary))',
-                stroke: 'hsl(var(--background))',
-                strokeWidth: 2,
-                r: 6,
-              }}
-            />
+            <Area type="monotone" dataKey="predicted" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#commitGradient)" dot={{ fill: 'hsl(var(--primary))', stroke: 'hsl(var(--background))', strokeWidth: 2, r: 4 }} activeDot={{ fill: 'hsl(var(--primary))', stroke: 'hsl(var(--background))', strokeWidth: 2, r: 6 }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

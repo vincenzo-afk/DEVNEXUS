@@ -325,6 +325,15 @@ export async function getGitHubStats(token: string) {
   return response.json();
 }
 
+export async function getGitHubContributions(token: string) {
+  const response = await fetch(`${API_URL}/github/contributions`, {
+    method: 'GET',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to fetch github contributions');
+  return response.json();
+}
+
 export async function getGitHubForecast(token: string) {
   const response = await fetch(`${API_URL}/github/forecast`, {
     method: 'GET',
