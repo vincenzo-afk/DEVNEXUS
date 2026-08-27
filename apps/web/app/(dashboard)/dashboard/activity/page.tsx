@@ -11,10 +11,12 @@ export default function ActivityPage() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 800);
+    setRefreshKey((key) => key + 1);
+    window.setTimeout(() => setIsRefreshing(false), 800);
   };
 
   const filterButtons: { key: FilterType; label: string; icon: React.ReactNode; color: string }[] = [
@@ -98,7 +100,7 @@ export default function ActivityPage() {
               <div className="w-8 h-8 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
             </div>
           ) : (
-            <ActivityFeed filterType={filterType} />
+            <ActivityFeed filterType={filterType} searchQuery={searchQuery} refreshKey={refreshKey} />
           )}
         </div>
       </div>

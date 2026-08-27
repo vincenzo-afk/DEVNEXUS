@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import ai, todos, notes, hackathons, github
+from routers import activity, ai, todos, notes, hackathons, github
 from middleware.auth import RateLimitMiddleware
 
 app = FastAPI(title="DevNexus API", version="1.0.0")
@@ -23,6 +23,7 @@ app.include_router(todos.router)
 app.include_router(notes.router)
 app.include_router(hackathons.router)
 app.include_router(github.router)
+app.include_router(activity.router)
 
 @app.get("/health")
 def health_check():

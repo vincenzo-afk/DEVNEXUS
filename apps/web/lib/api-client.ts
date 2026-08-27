@@ -306,6 +306,61 @@ export async function updateChecklistItem(hackathonId: string, itemId: string, c
   return response.json();
 }
 
+// Activity and notifications endpoints
+export async function syncActivity(token: string) {
+  const response = await fetch(`${API_URL}/activity/sync`, {
+    method: 'POST',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to sync activity');
+  return response.json();
+}
+
+export async function getActivity(token: string) {
+  const response = await fetch(`${API_URL}/activity`, {
+    method: 'GET',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to fetch activity');
+  return response.json();
+}
+
+export async function getNotifications(token: string) {
+  const response = await fetch(`${API_URL}/notifications`, {
+    method: 'GET',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to fetch notifications');
+  return response.json();
+}
+
+export async function markNotificationRead(notificationId: string, token: string) {
+  const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+    method: 'PUT',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to mark notification as read');
+  return response.json();
+}
+
+export async function markAllNotificationsRead(token: string) {
+  const response = await fetch(`${API_URL}/notifications/read-all`, {
+    method: 'POST',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to mark notifications as read');
+  return response.json();
+}
+
+export async function dismissNotification(notificationId: string, token: string) {
+  const response = await fetch(`${API_URL}/notifications/${notificationId}`, {
+    method: 'DELETE',
+    headers: getHeaders(token),
+  });
+  if (!response.ok) throw new Error('Failed to dismiss notification');
+  return response.json();
+}
+
 // GitHub endpoints
 export async function getGitHubRepos(token: string) {
   const response = await fetch(`${API_URL}/github/repos`, {
